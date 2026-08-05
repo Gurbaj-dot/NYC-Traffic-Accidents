@@ -1,0 +1,126 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+
+# Set style for plots
+sns.set_style("whitegrid")
+plt.rcParams["figure.figsize"] = (12, 6)
+
+# ----------------------
+# Load & prepare data
+# ----------------------
+# Replace with your file path
+df = pd.read_csv("/content/NYC_Accidents_2020[1].csv", sep=",")
+
+# Combine date + time into a single datetime column
+df["CRASH_DATETIME"] = pd.to_datetime(df["CRASH DATE"] + " " + df["CRASH TIME"])
+
+# Extract time components for analysis
+df["MONTH"] = df["CRASH_DATETIME"].dt.month_name()
+df["MONTH_NUM"] = df["CRASH_DATETIME"].dt.month
+df["DAY_OF_WEEK"] = df["CRASH_DATETIME"].dt.day_name()
+df["HOUR"] = df["CRASH_DATETIME"].dt.hour
+
+# Create fatal accident flag
+df["IS_FATAL"] = df["NUMBER OF PERSONS KILLED"].apply(lambda x: "Fatal" if x > 0 else "Non-Fatal")
+
+# Calculate totals & percentage
+monthly = df.groupby(["MONTH_NUM", "MONTH"]).size().reset_index(name="TOTAL_ACCIDENTS")
+monthly = monthly.sort_values("MONTH_NUM")
+monthly["PERCENT_OF_TOTAL"] = (monthly["TOTAL_ACCIDENTS"] / monthly["TOTAL_ACCIDENTS"].sum() * 100).round(1)
+
+# Plot
+plt.figure(figsize=(12,5))
+sns.barplot(data=monthly, x="MONTH", y="TOTAL_ACCIDENTS", color="#1f77b4")
+plt.title("Total Accidents by Month (Jan-Aug 2020)", fontsize=14)
+plt.xlabel("")
+plt.ylabel("Number of Accidents")
+plt.xticks(rotation=45)
+
+# Add percentage labels
+for i, row in monthly.iterrows():
+    plt.text(i, row["TOTAL_ACCIDENTS"] + 1, f"{row['PERCENT_OF_TOTAL']}%", ha="center")
+
+plt.tight_layout()
+plt.show()
+
+# Get top 10 streets
+street_counts = df["ON STREET NAME"].value_counts().reset_index(name="ACCIDENTS")
+street_counts = street_counts[street_counts["ON STREET NAME"] != ""].head(10)
+street_counts["PERCENT_OF_TOTAL"] = (street_counts["ACCIDENTS"] / len(df) * 100).round(1)
+
+plt.figure(figsize=(12,5))
+sns.barplot(data=street_counts, x="ACCIDENTS", y="ON STREET NAME", palette="Reds_r")
+plt.title("Top 10 Streets with Most Accidents", fontsize=14)
+plt.xlabel("Number of Accidents")
+plt.ylabel("")
+
+# Add percentage
+for i, row in street_counts.iterrows():
+    plt.text(row["ACCIDENTS"] + 0.5, i, f"{row['PERCENT_OF_TOTAL']}%", va="center")
+
+plt.tight_layout()
+plt.show()
+# Filter out empty/unspecified values
+factors = df["CONTRIBUTING FACTOR VEHICLE 1"].value_counts().reset_index(name="COUNT")
+factors = factors[~factors["CONTRIBUTING FACTOR VEHICLE 1"].isin(["Unspecified", ""])]
+factors["PERCENT"] = (factors["COUNT"] / len(df) * 100).round(1)
+
+plt.figure(figsize=(12,5))
+sns.barplot(data=factors.head(8), x="COUNT", y="CONTRIBUTING FACTOR VEHICLE 1", palette="Blues_r")
+plt.title("Top Contributing Factors (All Accidents)", fontsize=14)
+plt.xlabel("Number of Accidents")
+plt.ylabel("")
+plt.tight_layout()
+plt.show()
+
+fatal_factors = df[df["IS_FATAL"] == "Fatal"]["CONTRIBUTING FACTOR VEHICLE 1"].value_counts().reset_index(name="COUNT")
+fatal_factors = fatal_factors[~fatal_factors["CONTRIBUTING FACTOR VEHICLE 1"].isin(["Unspecified", ""])]
+
+plt.figure(figsize=(10,4))
+sns.barplot(data=fatal_factors.head(5), x="COUNT", y="CONTRIBUTING FACTOR VEHICLE 1", palette="Reds_r")
+plt.title("Top Causes of Fatal Accidents", fontsize=14)
+plt.xlabel("Number of Fatal Accidents")
+plt.ylabel("")
+plt.tight_layout()
+plt.show()
+
+print("===== ANALYSIS SUMMARY =====")
+print(f"Total Accidents in Dataset: {len(df)}")
+print(f"Total Persons Injured: {df['NUMBER OF PERSONS INJURED'].sum()}")
+print(f"Total Fatalities: {df['NUMBER OF PERSONS KILLED'].sum()}")
+print("\nTop 3 Months by Accidents:")
+print(monthly.sort_values("TOTAL_ACCIDENTS", ascending=False)[["MONTH", "TOTAL_ACCIDENTS", "PERCENT_OF_TOTAL"]].head(3))
+print("\nTop 3 Streets:")
+print(street_counts.head(3))
+print("\nTop Overall Cause:")
+print(factors.iloc[0][0], f"({factors.iloc[0][1]} cases, {factors.iloc[0][2]}%)")
+
+==== ANALYSIS SUMMARY =====
+Total Accidents in Dataset: 74881
+Total Persons Injured: 27448
+Total Fatalities: 144
+
+Top 3 Months by Accidents:
+      MONTH  TOTAL_ACCIDENTS  PERCENT_OF_TOTAL
+0   January            14287              19.1
+1  February            13684              18.3
+2     March            11057              14.8
+
+Top 3 Streets:
+               ON STREET NAME  ACCIDENTS  PERCENT_OF_TOTAL
+0                BELT PARKWAY       1241               1.7
+1      LONG ISLAND EXPRESSWAY        745               1.0
+2  BROOKLYN QUEENS EXPRESSWAY        738               1.0
+
+Top Overall Cause:
+Driver Inattention/Distraction (19123 cases, 25.5%)
+
+/tmp/ipykernel_1315/2612230350.py:10: FutureWarning: Series.__getitem__ treating keys as positions is deprecated. In a future version, integer keys will always be treated as labels (consistent with DataFrame behavior). To access a value by position, use `ser.iloc[pos]`
+  print(factors.iloc[0][0], f"({factors.iloc[0][1]} cases, {factors.iloc[0][2]}%)")
+
+
+
+
+print(df[["CRASH_DATETIME", "BOROUGH", "MONTH", "DAY_OF_WEEK", "HOUR", "IS_FATAL"]].head())
